@@ -113,7 +113,7 @@ class MarkdownPreviewCommand(sublime_plugin.TextCommand):
         html = RE_SOURCES.sub(tag_fix, html)
         return html
 
-    def convert_markdown(self, markdown):
+    def convert_markdown(self, markdown, apply_postproess):
         ''' convert input markdown to HTML, with github or builtin parser '''
         config_parser = settings.get('parser')
         github_oauth_token = settings.get('github_oauth_token')
@@ -152,17 +152,18 @@ class MarkdownPreviewCommand(sublime_plugin.TextCommand):
                 for marker in toc_markers:
                     markdown_html = markdown_html.replace(marker, toc_html)
 
-            # postprocess the html from internal parser
-            markdown_html = self.postprocessor(markdown_html)
+            if apply_postproess:
+                # postprocess the html from internal parser
+                markdown_html = self.postprocessor(markdown_html)
 
         return markdown_html
 
-    def run(self, edit, target='browser'):
+    def run(self, edit, target='browser', options={}):
         region = sublime.Region(0, self.view.size())
 
         contents = self.get_contents(region)
 
-        markdown_html = self.convert_markdown(contents)
+        markdown_html = self.convert_markdown(contents, target == 'browser')
 
         full_html = u'<!DOCTYPE html>'
         full_html += '<html><head><meta charset="utf-8">'
@@ -171,6 +172,8 @@ class MarkdownPreviewCommand(sublime_plugin.TextCommand):
         full_html += markdown_html
         full_html += '</body>'
         full_html += '</html>'
+
+        with_style = options.get('style', True)
 
         if target in ['disk', 'browser']:
             # check if LiveReload ST2 extension installed and add its script to the resulting HTML
@@ -204,7 +207,7 @@ class MarkdownPreviewCommand(sublime_plugin.TextCommand):
             new_view = self.view.window().new_file()
             new_view.set_scratch(True)
             new_edit = new_view.begin_edit()
-            new_view.insert(new_edit, 0, markdown_html)
+            new_view.insert(new_edit, 0, full_html if with_style else markdown_html)
             new_view.end_edit(new_edit)
             sublime.status_message('Markdown preview launched in sublime')
         elif target == 'clipboard':
